@@ -159,9 +159,15 @@ final[final$Team != '2TM',]
 #look at individual
 final[final$LastName == 'Folk',]
 
+
+kickers_final <- final[final$Pos == 'K',]
+final <- final[final$Pos != 'K',]
 summary(final)
 ```
 
+```{r}
+
+```
 
 
 
