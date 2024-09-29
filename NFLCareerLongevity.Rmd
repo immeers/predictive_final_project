@@ -13,6 +13,11 @@ concsussion_count <- read.csv("totalConcussion.csv")
 
 ```
 
+```{r}
+library(dplyr)
+library(tidyverse)
+```
+
 
 ```{r}
 all_seasons <- read.csv("NFL Player Stats(1922 - 2022).csv")
@@ -23,6 +28,14 @@ seasons <- seasons %>%
 head(seasons)
 dim(seasons)
 all_injuries <- read.csv("totalConcussion.csv") #injury and concussion by player and year
+all_injuries <-  all_injuries %>% separate(Player, into = c("FirstName", "LastName"), sep = " ")
+
+unique(all_injuries$Position)
+
+unique(seasons$Pos)
+
+
+all_injuries$PlayerID <- paste0(substring(all_injuries$FirstName, 1, 1), all_injuries$LastName)
 
 
 ```
