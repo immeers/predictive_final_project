@@ -29,7 +29,7 @@ head(seasons)
 dim(seasons)
 all_injuries <- read.csv("totalConcussion.csv") #injury and concussion by player and year
 all_injuries <-  all_injuries %>% separate(Player, into = c("FirstName", "LastName"), sep = " ")
-
+all_injuries <- all_injuries[all_injuries$Position != 'Position',]
 unique(all_injuries$Position)
 
 unique(seasons$Pos)
