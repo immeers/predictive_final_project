@@ -6,7 +6,11 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
+library(tidyverse)
 knitr::opts_chunk$set(echo = TRUE)
+status <- read.csv("status.csv")
+concsussion_count <- read.csv("totalConcussion.csv")
+
 ```
 
 
@@ -19,6 +23,7 @@ seasons <- seasons %>%
 head(seasons)
 dim(seasons)
 all_injuries <- read.csv("totalConcussion.csv") #injury and concussion by player and year
+
 
 ```
 
