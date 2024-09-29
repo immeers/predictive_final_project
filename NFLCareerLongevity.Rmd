@@ -161,11 +161,35 @@ final[final$LastName == 'Folk',]
 
 
 kickers_final <- final[final$Pos == 'K',]
-final <- final[final$Pos != 'K',]
+final <- final[final$Pos != 'K',] %>% select(-FGM, -FGA)
 summary(final)
 ```
 
 ```{r}
+library(splitstackshape)
+set.seed(123456) # Set seed
+# Perform stratified sampling
+ split_dat <- stratified(final, # Set dataset
+                         group = c("YearsRemaining", "FirstName", "LastName", "Pos"), # Set variables to use for stratification
+                         size = 0.2,  # Set size of test set
+                         bothSets = TRUE ) # Return both training and test sets
+ # Extract train data
+ train_dat <- split_dat[[2]]
+ # Extract test data
+ test_dat <- split_dat[[1]]
+
+# Check size
+nrow(train_dat)
+# Ensure YearsRemaining is numeric
+train_dat$YearsRemaining <- as.numeric(as.character(train_dat$YearsRemaining))
+
+
+linear <- lm(YearsRemaining ~ Age + Pts, train_dat)
+summary(linear)
+
+preds <- predict(linear, test_dat)
+t <- table(preds, test_dat$YearsRemaining) # Create table
+confusionMatrix(t, positive = "TOR") # Produce confusion matrix
 
 ```
 
