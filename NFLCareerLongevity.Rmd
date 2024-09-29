@@ -14,6 +14,8 @@ knitr::opts_chunk$set(echo = TRUE)
 all_seasons <- read.csv("NFL Player Stats(1922 - 2022).csv")
 head(all_seasons)
 seasons <- all_seasons[all_seasons$Season >= 2006,] #only have injury data from 2006 onwards
+seasons <- seasons %>%
+  select(Tm, Season, Player, Age, Pos, G, GS, AllTD, Pts, Pts.G, FGM, FGA)
 head(seasons)
 dim(seasons)
 all_injuries <- read.csv("totalConcussion.csv") #injury and concussion by player and year
