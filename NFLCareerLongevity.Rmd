@@ -86,6 +86,7 @@ sort(unique(seasons$Pos))
 
 
 ```
+
 ```{r}
 unique(all_injuries$Team)
 unique(seasons$Tm)
