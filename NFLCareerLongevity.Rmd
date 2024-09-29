@@ -34,8 +34,52 @@ unique(all_injuries$Position)
 
 unique(seasons$Pos)
 
-
 all_injuries$PlayerID <- paste0(substring(all_injuries$FirstName, 1, 1), all_injuries$LastName)
+```
+
+
+```{r}
+seasons <- seasons %>%
+  mutate(Pos = ifelse(Pos %in% c("LCB", "CB", "RCB", "RCB/LCB", "DB/RCB", "RCB/LCB/DB", "LCB/RCB", "DB/LCB", "RCB/DB",
+                                 "SS", "FS", "SS/FS", "LCB/FS", "DB/FS", "FS/SS", "SS/RLB", "S", "DB"), "DB", Pos))
+
+seasons <- seasons %>%
+  mutate(Pos = ifelse(Pos %in% c("MLB", "ROLB", "LLB/ROLB", "RLB", "RLB/MLB", "LOLB", "LLB", "LILB", "LB", "LILB/ROL", 
+                                 "RILB", "LLB/RLB", "LB/LLB", "LLB/MLB", "LILB/RIL", "ROLB/LOL", "OLB", "MLB/RLB"), "LB", Pos))
+
+seasons <- seasons %>%
+  mutate(Pos = ifelse(Pos %in% c("LT/RT", "RT/LT", "LT", "T", "NT", "RT"), "T", Pos))
+
+seasons <- seasons %>%
+  mutate(Pos = ifelse(Pos %in% c("LDT/RDT", "LDT", "DT", "DT/LDT", "RDT", "DL"), "DT", Pos))
+
+seasons <- seasons %>%
+  mutate(Pos = ifelse(Pos %in% c("RDE/LDE", "RDE", "DE", "LDE/RDE", "LDE"), "DE", Pos))
+
+seasons <- seasons %>%
+  mutate(Pos = ifelse(Pos %in% c("LG", "G"), "G", Pos))
+
+seasons <- seasons %>%
+  mutate(Pos = ifelse(Pos %in% c("C/LG"), "C", Pos))
+
+seasons <- seasons %>%
+  mutate(Pos = ifelse(Pos %in% c("RB/TE", "FB", "DT/FB"), "FB", Pos))
+
+seasons <- seasons %>%
+  mutate(Pos = ifelse(Pos %in% c("QB", "WR/QB"), "QB", Pos))
+
+all_injuries <- all_injuries %>%
+  mutate(Position = ifelse(Position %in% c("CB", "DB", "S"), "DB", Position))
+
+seasons <- seasons[seasons$Pos != "",]
+all_injuries <- all_injuries[all_injuries$Position != "LS",]
+all_injuries <- all_injuries[all_injuries$Position != "KR",]
+all_injuries <- all_injuries[all_injuries$Position != "PR",]
+
+sort(unique(all_injuries$Position))
+sort(unique(seasons$Pos))
+
+
 
 
 ```
