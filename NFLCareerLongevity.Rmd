@@ -12,6 +12,9 @@ status <- read.csv("status.csv")
 concsussion_count <- read.csv("totalConcussion.csv")
 
 ```
+```{r}
+
+```
 
 ```{r}
 library(dplyr)
@@ -113,5 +116,30 @@ test<- test %>% group_by(FirstName, LastName) %>%
 injuries <- 
 status <- 
 full_join(seasons, all_injuries, by = 'PlayerID')
+```
+```{r}
+unique(all_injuries$Team)
+unique(seasons$Tm)
+
+seasons$Team <- seasons$Tm
+
+InjuriesSeason <- inner_join(all_injuries, seasons, by = "Team")
+
+class(all_injuries$Team)
+patterns <- c("Seahawks","Steelers", "Cowboys", "Lions", "Browns",       
+"Chiefs","Dolphins","Eagles", "Buccaneers", "Vikings", "Saints", "Packers",
+"Colts", "Falcons", "Bengals","Raiders", "Broncos", "Ravens", "Commanders",
+"Giants", "49ers", "Jets", "Jaguars", "Panthers", "Bears", "Texans", "Patriots",
+"Rams", "Chargers", "Titans", "Bills", "Cardinals", "Football Team", "Redskins",
+"Niners")
+replacements <- c("SEA", "PIT", "DAL", "DET", "CLE", "KAN", "MIA", "PHI",
+              "TAM", "MIN", "NOR", "GNB", "IND", "ATL", "CIN", "LVR",
+              "DEN", "BAL", "WAS", "NYG", "SFO", "NYJ", "JAX", "CAR", "CHI",
+              "HOU", "NWE", "LAR", "LAC", "TEN", "BUF", "ARI", "WAS", "WAS", "SFO")
+for (i in 1:length(patterns)) {
+  all_injuries$Team <- gsub(patterns[i], replacements[i], all_injuries$Team)
+}
+
+
 ```
 
