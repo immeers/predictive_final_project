@@ -9,10 +9,6 @@ output: html_document
 library(tidyverse)
 knitr::opts_chunk$set(echo = TRUE)
 status <- read.csv("status.csv")
-concsussion_count <- read.csv("totalConcussion.csv")
-
-```
-```{r}
 
 ```
 
@@ -40,20 +36,10 @@ seasons$LastName <- gsub("\\+$", "", seasons$LastName)
 seasons <-  seasons %>% mutate(AllTD = ifelse(is.na(AllTD),0, AllTD))
 
 
-#make injury ID to merge
-all_injuries$PlayerID <- paste0(paste0(paste0(substring(all_injuries$FirstName, 1, 1), all_injuries$LastName), all_injuries$Position), all_injuries$Season)
-
-#make season ID to merge
-seasons$PlayerID <- paste0(paste0(paste0(substring(seasons$FirstName, 1, 1), seasons$LastName), seasons$Pos), seasons$Season)
-
-#make status ID to merge
-status$PlayerID <- paste0(paste0(paste0(substring(status$FirstName, 1, 1), status$LastName), status$Pos), status$Season)
-
-
 ```
 
 
-```{r}
+```{r Clean Position Col}
 seasons <- seasons %>%
   mutate(Pos = ifelse(Pos %in% c("LCB", "CB", "RCB", "RCB/LCB", "DB/RCB", "RCB/LCB/DB", "LCB/RCB", "DB/LCB", "RCB/DB",
                                  "SS", "FS", "SS/FS", "LCB/FS", "DB/FS", "FS/SS", "SS/RLB", "S", "DB"), "DB", Pos))
@@ -97,29 +83,8 @@ sort(unique(seasons$Pos))
 
 ```
 
-```{r}
-#Making cumulative cols and response var
-test <- seasons
-test <- test %>%
-  group_by(FirstName, LastName) %>%
-  arrange(Season) %>%
-  mutate(G = cumsum(G), GS = cumsum(GS), AllTD = cumsum(AllTD), Pts = cumsum(Pts),
-         FGM = cumsum(FGM), FGA = cumsum((FGA)))
 
-test<- test %>% group_by(FirstName, LastName) %>%
-  arrange(Season)%>% mutate(YearsRemaining = max(Season) - Season)
-```
-
-
-```{r}
-#MERGE ON INJURIES AND SEASONS
-injuries <- 
-status <- 
-full_join(seasons, all_injuries, by = 'PlayerID')
-```
-```{r}
-unique(all_injuries$Team)
-unique(seasons$Tm)
+```{r Clean Team Col}
 
 seasons$Team <- seasons$Tm
 
@@ -140,6 +105,66 @@ for (i in 1:length(patterns)) {
   all_injuries$Team <- gsub(patterns[i], replacements[i], all_injuries$Team)
 }
 
+head(all_injuries)
 
 ```
+
+
+```{r Make the PlayerIDs}
+#make injury ID to merge
+all_injuries$PlayerID <- paste0(paste0(paste0(substring(all_injuries$FirstName, 1, 1), all_injuries$LastName), all_injuries$Position), all_injuries$Season)
+
+#make season ID to merge
+seasons$PlayerID <- paste0(paste0(paste0(substring(seasons$FirstName, 1, 1), seasons$LastName), seasons$Pos), seasons$Season)
+
+#make status ID to merge
+status$PlayerID <- paste0(paste0(paste0(substring(status$FirstName, 1, 1), status$LastName), status$Pos), status$Season)
+```
+
+
+```{r}
+#MERGE ON INJURIES AND SEASONS
+injuries <-  all_injuries %>% select(PlayerID, TotalInjuryCount, ConcussionTotal)
+seasons2010 <- seasons[seasons$Season >= 2010,] %>% select(-Tm)
+joined <- left_join(seasons2010, injuries, by = 'PlayerID')
+joined <- joined %>% mutate(ConcussionTotal = ifelse(is.na(ConcussionTotal),0, ConcussionTotal))
+joined <- joined %>% mutate(TotalInjuryCount = ifelse(is.na(TotalInjuryCount),0, TotalInjuryCount))
+
+head(joined)
+```
+
+
+```{r Make final dataset}
+#Making cumulative cols and response var
+final <- joined
+final <- final %>%
+  group_by(FirstName, LastName, Pos) %>%
+  arrange(Season) %>%
+  mutate(G = cumsum(G), GS = cumsum(GS), AllTD = cumsum(AllTD), Pts = cumsum(Pts),
+         FGM = cumsum(FGM), FGA = cumsum((FGA)), ConcussionTotal = cumsum(ConcussionTotal), TotalInjuryCount = cumsum(TotalInjuryCount))
+
+
+#create response
+final <- final %>% group_by(FirstName, LastName, Pos) %>%
+  arrange(Season)%>% mutate(YearsRemaining = max(Season) - Season)
+
+head(final)
+
+
+#drop players that moved around a lot
+final[final$Team != '3TM',]
+final[final$Team != '2TM',]
+
+
+#look at individual
+final[final$LastName == 'Folk',]
+
+summary(final)
+```
+
+
+
+
+
+
 
