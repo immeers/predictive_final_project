@@ -163,37 +163,89 @@ final[final$LastName == 'Folk',]
 kickers_final <- final[final$Pos == 'K',]
 final <- final[final$Pos != 'K',] %>% select(-FGM, -FGA)
 summary(final)
+
+
+final_1 <- final
+final_1$FiveYrLeft <- ifelse(final_1$YearsRemaining >= 5, 1 ,0)
+final_1 <- final_1 %>% select(-YearsRemaining)
 ```
 
 ```{r}
-library(splitstackshape)
-set.seed(123456) # Set seed
-# Perform stratified sampling
- split_dat <- stratified(final, # Set dataset
-                         group = c("YearsRemaining", "FirstName", "LastName", "Pos"), # Set variables to use for stratification
-                         size = 0.2,  # Set size of test set
-                         bothSets = TRUE ) # Return both training and test sets
- # Extract train data
- train_dat <- split_dat[[2]]
- # Extract test data
- test_dat <- split_dat[[1]]
+library(caret)
 
-# Check size
-nrow(train_dat)
+set.seed(123)
+train_index <- createDataPartition(final$YearsRemaining, p = 0.8, list = FALSE)
+train_data <- final[train_index, ]
+test_data <- final[-train_index, ]
+
+# Check the dimensions
+dim(train_data)
+dim(test_data)
+
+
 # Ensure YearsRemaining is numeric
-train_dat$YearsRemaining <- as.numeric(as.character(train_dat$YearsRemaining))
+train_data$YearsRemaining <- as.numeric(as.character(train_data$YearsRemaining))
+train_data$YearsRemaining <- as.numeric(as.character(train_data$YearsRemaining))
+
+names(final)
+
+train_dataRB <- train_data[train_data$Pos == 'RB',] 
+train_dataRB<- train_dataRB %>% ungroup() %>% select(YearsRemaining,Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal)
+
+test_dataRB <- test_data[test_data$Pos == 'RB',]
+test_dataRB<- test_dataRB %>% ungroup() %>% select(YearsRemaining, Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal)
+
+linearRB <- lm(YearsRemaining ~ ., train_dataRB)
 
 
-linear <- lm(YearsRemaining ~ Age + Pts, train_dat)
-summary(linear)
+# Get predictions with 95% confidence intervals
+predictions <- predict(linearRB, newdata = test_dataRB)
+intervals <- predictions
+intervals$lwr <- predictions - 2
+intervals$upp <- predictions + 2
+intervals_1 <- ifelse(test_dataRB$YearsRemaining >= intervals$lwr & test_dataRB$YearsRemaining <= intervals$upp, 1, 0)
+sum(intervals_1)/length(intervals_1)
 
-preds <- predict(linear, test_dat)
-t <- table(preds, test_dat$YearsRemaining) # Create table
-confusionMatrix(t, positive = "TOR") # Produce confusion matrix
 
 ```
 
+```{r}
+library(caret)
 
+set.seed(123)
+train_index <- createDataPartition(final_1$FiveYrLeft, p = 0.8, list = FALSE)
+train_data <- final_1[train_index, ]
+test_data <- final_1[-train_index, ]
+
+# Check the dimensions
+dim(train_data)
+dim(test_data)
+
+
+# Ensure as.factor(train_data$FiveYrLeft)
+train_data$FiveYrLeft <- as.numeric(train_data$FiveYrLeft)
+test_data$FiveYrLeft <- as.numeric(test_data$FiveYrLeft)
+
+names(final)
+
+train_dataRB <- train_data[train_data$Pos == 'RB',] 
+train_dataRB<- train_dataRB %>% ungroup() %>% select(FiveYrLeft,Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal)
+
+test_dataRB <- test_data[test_data$Pos == 'RB',]
+test_dataRB<- test_dataRB %>% ungroup() %>% select(FiveYrLeft, Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal)
+
+linearRB <- glm(FiveYrLeft ~ ., train_dataRB, family = "binomial")
+
+
+# Get predictions with 95% confidence intervals
+predictions <- predict(linearRB, newdata = test_dataRB, type = "response")
+
+test_pred <- ifelse(is.na(predictions), NA, ifelse(predictions > 0.5, 1, 0))
+
+ifelse(test_dataRB$YearsRemaining >= data.frame(predictions)$lwr & test_dataRB$YearsRemaining <= data.frame(predictions)$upr, 1, 0)
+
+
+```
 
 
 
