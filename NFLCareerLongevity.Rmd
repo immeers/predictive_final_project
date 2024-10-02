@@ -291,6 +291,50 @@ accuracy <- mean(test_pred == test_dataRB$ThreeYrLeft)
 
 ```
 
+WR Accuracy Model
+```{r}
+train_dataWR <- train_data[train_data$Pos == 'WR',] 
+train_dataWR<- train_dataWR %>% ungroup() %>% select(ThreeYrLeft,Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal)
+
+test_dataWR <- test_data[test_data$Pos == 'WR',]
+test_dataWR <- test_dataWR %>% ungroup() %>% select(ThreeYrLeft, Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal)
+
+logisticWR <- glm(ThreeYrLeft ~ ., train_dataWR, family = "binomial")
+summary(logisticWR)
+#AIC of 2072.6
+
+logisticWR1 <- glm(ThreeYrLeft ~ Age * Pts * AllTD*G, train_dataWR, family = "binomial")
+summary(logisticWR1)
+#AIC: 1963.4
+
+predictions <- predict(logisticWR1, newdata = test_dataWR, type = "response")
+
+#Threshold Testing
+curr = 0
+for (i in seq(0.3, 0.7, by = 0.01)){
+  test_pred <- ifelse(is.na(predictions), NA, ifelse(predictions > i, 1, 0))
+  
+  accuracy <- mean(test_pred == test_dataWR$ThreeYrLeft)
+  
+  
+  if (accuracy > curr){
+    print(accuracy)
+    best = c(i, accuracy)
+    curr = accuracy
+  }
+  
+}
+
+test_pred <- ifelse(is.na(predictions), NA, ifelse(predictions > best[1], 1, 0))
+conf_matrix <- table(test_pred, test_dataWR$ThreeYrLeft)
+
+# Calculate metrics
+precision <- conf_matrix[2, 2] / sum(conf_matrix[2, ])
+recall <- conf_matrix[2, 2] / sum(conf_matrix[, 2])
+f1_score <- 2 * (precision * recall) / (precision + recall)
+accuracy <- mean(test_pred == test_dataWR$ThreeYrLeft)
+accuracy
+```
 
 ```{r Random Effects}
 library(lme4)
