@@ -177,6 +177,8 @@ summary(final)
 
 
 final_1 <- final
+final$ThreeYrLeft <- ifelse(final$YearsRemaining >= 3, 1 ,0)
+
 final_1$ThreeYrLeft <- ifelse(final_1$YearsRemaining >= 3, 1 ,0)
 final_1 <- final_1 %>% select(-YearsRemaining)
 ```
@@ -206,15 +208,15 @@ train_dataRB<- train_dataRB %>% ungroup() %>% select(YearsRemaining,Age, G, GS, 
 test_dataRB <- test_data[test_data$Pos == 'RB',]
 test_dataRB<- test_dataRB %>% ungroup() %>% select(YearsRemaining, Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal)
 
-linearRB <- lm(YearsRemaining ~ ., train_dataRB)
-
-
-# Get predictions with 95% confidence intervals
-predictions <- predict(linearRB, newdata = test_dataRB)
-intervals <- predictions
-intervals$lwr <- predictions - 2
-intervals$upp <- predictions + 2
-intervals_1 <- ifelse(test_dataRB$YearsRemaining >= intervals$lwr & test_dataRB$YearsRemaining <= intervals$upp, 1, 0)
+# linearRB <- lm(YearsRemaining ~ ., train_dataRB)
+# 
+# 
+# # Get predictions with 95% confidence intervals
+# predictions <- predict(linearRB, newdata = test_dataRB)
+# intervals <- predictions
+# intervals$lwr <- predictions - 2
+# intervals$upp <- predictions + 2
+# intervals_1 <- ifelse(test_dataRB$YearsRemaining >= intervals$lwr & test_dataRB$YearsRemaining <= intervals$upp, 1, 0)
 
 
 ```
@@ -244,8 +246,8 @@ train_dataRB<- train_dataRB %>% ungroup() %>% select(ThreeYrLeft,Age, G, GS, All
 test_dataRB <- test_data[test_data$Pos == 'RB',]
 test_dataRB<- test_dataRB %>% ungroup() %>% select(ThreeYrLeft, Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal)
 
-linearRB <- glm(ThreeYrLeft ~ ., train_dataRB, family = "binomial")
-summary(linearRB)
+logisticRB <- glm(ThreeYrLeft ~ ., train_dataRB, family = "binomial")
+summary(logisticRB)
 #AIC: 1290.1
 ```
 Our first model is a linear model for RB using all features and of those features Age, Pts Scored, TD Scored and Games Played were significant. This model had an AIC of 1290.1. Next we ran a mixed effects linear model using the significant factors.
@@ -253,11 +255,11 @@ Our first model is a linear model for RB using all features and of those feature
 
 ```{r}
 
-linearRB1 <- glm(ThreeYrLeft ~ Age * Pts * AllTD*G, train_dataRB, family = "binomial")
-summary(linearRB1)
+logisticRB1 <- glm(ThreeYrLeft ~ Age * Pts * AllTD*G, train_dataRB, family = "binomial")
+summary(logisticRB1)
 #AIC: 1257.7
 
-predictions <- predict(linearRB1, newdata = test_dataRB, type = "response")
+predictions <- predict(logisticRB1, newdata = test_dataRB, type = "response")
 
 
 #Threshold Testing
@@ -288,6 +290,21 @@ accuracy <- mean(test_pred == test_dataRB$ThreeYrLeft)
 ```
 
 
+```{r Random Effects}
+library(lme4)
+pos_data <- final %>% ungroup() %>% select(Season, Age, Pos, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal, YearsRemaining)
+position <- lmer(YearsRemaining ~ . + (1|Pos), data = pos_data)
+summary(position)
+random_effects = ranef(position)
+ranef_df <-  data.frame(
+  int = random_effects$Pos$`(Intercept)`,
+  pos = rownames(random_effects$Pos)
+)
+
+ggplot(ranef_df, aes(x=int, y=reorder(pos, int))) +
+  geom_point() + 
+  labs(x= "intercept", y="player") +
+  theme_minimal()
 ```
 
 
