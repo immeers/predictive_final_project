@@ -166,7 +166,7 @@ summary(final)
 
 
 final_1 <- final
-final_1$FiveYrLeft <- ifelse(final_1$YearsRemaining >= 5, 1 ,0)
+final_1$ThreeYrLeft <- ifelse(final_1$YearsRemaining >= 3, 1 ,0)
 final_1 <- final_1 %>% select(-YearsRemaining)
 ```
 
@@ -204,7 +204,6 @@ intervals <- predictions
 intervals$lwr <- predictions - 2
 intervals$upp <- predictions + 2
 intervals_1 <- ifelse(test_dataRB$YearsRemaining >= intervals$lwr & test_dataRB$YearsRemaining <= intervals$upp, 1, 0)
-sum(intervals_1)/length(intervals_1)
 
 
 ```
@@ -213,7 +212,7 @@ sum(intervals_1)/length(intervals_1)
 library(caret)
 
 set.seed(123)
-train_index <- createDataPartition(final_1$FiveYrLeft, p = 0.8, list = FALSE)
+train_index <- createDataPartition(final_1$ThreeYrLeft, p = 0.8, list = FALSE)
 train_data <- final_1[train_index, ]
 test_data <- final_1[-train_index, ]
 
@@ -223,26 +222,59 @@ dim(test_data)
 
 
 # Ensure as.factor(train_data$FiveYrLeft)
-train_data$FiveYrLeft <- as.numeric(train_data$FiveYrLeft)
-test_data$FiveYrLeft <- as.numeric(test_data$FiveYrLeft)
+train_data$ThreeYrLeft <- as.numeric(train_data$ThreeYrLeft)
+test_data$ThreeYrLeft <- as.numeric(test_data$ThreeYrLeft)
 
 names(final)
 
 train_dataRB <- train_data[train_data$Pos == 'RB',] 
-train_dataRB<- train_dataRB %>% ungroup() %>% select(FiveYrLeft,Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal)
+train_dataRB<- train_dataRB %>% ungroup() %>% select(ThreeYrLeft,Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal)
 
 test_dataRB <- test_data[test_data$Pos == 'RB',]
-test_dataRB<- test_dataRB %>% ungroup() %>% select(FiveYrLeft, Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal)
+test_dataRB<- test_dataRB %>% ungroup() %>% select(ThreeYrLeft, Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal)
 
-linearRB <- glm(FiveYrLeft ~ ., train_dataRB, family = "binomial")
+linearRB <- glm(ThreeYrLeft ~ ., train_dataRB, family = "binomial")
+summary(linearRB)
+#AIC: 1290.1
+```
+Our first model is a linear model for RB using all features and of those features Age, Pts Scored, TD Scored and Games Played were significant. This model had an AIC of 1290.1. Next we ran a mixed effects linear model using the significant factors.
 
 
-# Get predictions with 95% confidence intervals
-predictions <- predict(linearRB, newdata = test_dataRB, type = "response")
+```{r}
 
-test_pred <- ifelse(is.na(predictions), NA, ifelse(predictions > 0.5, 1, 0))
+linearRB1 <- glm(ThreeYrLeft ~ Age * Pts * AllTD*G, train_dataRB, family = "binomial")
+summary(linearRB1)
+#AIC: 1257.7
 
-ifelse(test_dataRB$YearsRemaining >= data.frame(predictions)$lwr & test_dataRB$YearsRemaining <= data.frame(predictions)$upr, 1, 0)
+predictions <- predict(linearRB1, newdata = test_dataRB, type = "response")
+
+
+#Threshold Testing
+curr = 0
+for (i in seq(0.3, 0.7, by = 0.01)){
+  test_pred <- ifelse(is.na(predictions), NA, ifelse(predictions > i, 1, 0))
+  
+  accuracy <- mean(test_pred == test_dataRB$ThreeYrLeft)
+  
+  
+  if (accuracy > curr){
+    print(accuracy)
+    best = c(i, accuracy)
+    curr = accuracy
+  }
+ 
+}
+
+test_pred <- ifelse(is.na(predictions), NA, ifelse(predictions > best[1], 1, 0))
+conf_matrix <- table(test_pred, test_dataRB$ThreeYrLeft)
+
+# Calculate metrics
+precision <- conf_matrix[2, 2] / sum(conf_matrix[2, ])
+recall <- conf_matrix[2, 2] / sum(conf_matrix[, 2])
+f1_score <- 2 * (precision * recall) / (precision + recall)
+accuracy <- mean(test_pred == test_dataRB$ThreeYrLeft)
+
+```
 
 
 ```
