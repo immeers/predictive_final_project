@@ -9,10 +9,6 @@ output: html_document
 library(tidyverse)
 knitr::opts_chunk$set(echo = TRUE)
 status <- read.csv("status.csv")
-concsussion_count <- read.csv("totalConcussion.csv")
-
-```
-```{r}
 
 ```
 
@@ -27,21 +23,23 @@ all_seasons <- read.csv("NFL Player Stats(1922 - 2022).csv")
 head(all_seasons)
 seasons <- all_seasons[all_seasons$Season >= 2006,] #only have injury data from 2006 onwards
 seasons <- seasons %>%
-  select(Tm, Season, Player, Age, Pos, G, GS, AllTD, Pts, Pts.G, FGM, FGA)
+  select(Tm, Season, Player, Age, Pos, G, GS, AllTD, Pts, FGM, FGA)
 head(seasons)
 dim(seasons)
 all_injuries <- read.csv("totalConcussion.csv") #injury and concussion by player and year
 all_injuries <-  all_injuries %>% separate(Player, into = c("FirstName", "LastName"), sep = " ")
 all_injuries <- all_injuries[all_injuries$Position != 'Position',]
-unique(all_injuries$Position)
 
-unique(seasons$Pos)
+#clean seasons
+seasons <-  seasons %>% separate(Player, into = c("FirstName", "LastName"), sep = " ")
+seasons$LastName <- gsub("\\+$", "", seasons$LastName)
+seasons <-  seasons %>% mutate(AllTD = ifelse(is.na(AllTD),0, AllTD))
 
-all_injuries$PlayerID <- paste0(substring(all_injuries$FirstName, 1, 1), all_injuries$LastName)
+
 ```
 
 
-```{r}
+```{r Clean Position Col}
 seasons <- seasons %>%
   mutate(Pos = ifelse(Pos %in% c("LCB", "CB", "RCB", "RCB/LCB", "DB/RCB", "RCB/LCB/DB", "LCB/RCB", "DB/LCB", "RCB/DB",
                                  "SS", "FS", "SS/FS", "LCB/FS", "DB/FS", "FS/SS", "SS/RLB", "S", "DB"), "DB", Pos))
@@ -83,13 +81,22 @@ sort(unique(all_injuries$Position))
 sort(unique(seasons$Pos))
 
 
-
-
 ```
 
+<<<<<<< HEAD
 ```{r}
 unique(all_injuries$Team)
 unique(seasons$Tm)
+
+  
+
+```
+
+```
+
+```
+```{r Clean Team Col}
+ "df8d21cb55cec0801ca51a6f5319bec49bd5909f"
 
 seasons$Team <- seasons$Tm
 
@@ -110,6 +117,95 @@ for (i in 1:length(patterns)) {
   all_injuries$Team <- gsub(patterns[i], replacements[i], all_injuries$Team)
 }
 
+head(all_injuries)
+```
+
+
+```{r Make the PlayerIDs}
+#make injury ID to merge
+all_injuries$PlayerID <- paste0(paste0(paste0(substring(all_injuries$FirstName, 1, 1), all_injuries$LastName), all_injuries$Position), all_injuries$Season)
+
+#make season ID to merge
+seasons$PlayerID <- paste0(paste0(paste0(substring(seasons$FirstName, 1, 1), seasons$LastName), seasons$Pos), seasons$Season)
+
+#make status ID to merge
+status$PlayerID <- paste0(paste0(paste0(substring(status$FirstName, 1, 1), status$LastName), status$Pos), status$Season)
+```
+
+
+```{r}
+#MERGE ON INJURIES AND SEASONS
+injuries <-  all_injuries %>% select(PlayerID, TotalInjuryCount, ConcussionTotal)
+seasons2010 <- seasons[seasons$Season >= 2010,] %>% select(-Tm)
+joined <- left_join(seasons2010, injuries, by = 'PlayerID')
+joined <- joined %>% mutate(ConcussionTotal = ifelse(is.na(ConcussionTotal),0, ConcussionTotal))
+joined <- joined %>% mutate(TotalInjuryCount = ifelse(is.na(TotalInjuryCount),0, TotalInjuryCount))
+
+head(joined)
+```
+
+
+```{r Make final dataset}
+#Making cumulative cols and response var
+final <- joined
+final <- final %>%
+  group_by(FirstName, LastName, Pos) %>%
+  arrange(Season) %>%
+  mutate(G = cumsum(G), GS = cumsum(GS), AllTD = cumsum(AllTD), Pts = cumsum(Pts),
+         FGM = cumsum(FGM), FGA = cumsum((FGA)), ConcussionTotal = cumsum(ConcussionTotal), TotalInjuryCount = cumsum(TotalInjuryCount))
+
+
+#create response
+final <- final %>% group_by(FirstName, LastName, Pos) %>%
+  arrange(Season)%>% mutate(YearsRemaining = max(Season) - Season)
+
+head(final)
+
+
+#drop players that moved around a lot
+final[final$Team != '3TM',]
+final[final$Team != '2TM',]
+
+
+#look at individual
+final[final$LastName == 'Folk',]
+
+
+kickers_final <- final[final$Pos == 'K',]
+final <- final[final$Pos != 'K',] %>% select(-FGM, -FGA)
+summary(final)
+```
+
+```{r}
+library(splitstackshape)
+set.seed(123456) # Set seed
+# Perform stratified sampling
+ split_dat <- stratified(final, # Set dataset
+                         group = c("YearsRemaining", "FirstName", "LastName", "Pos"), # Set variables to use for stratification
+                         size = 0.2,  # Set size of test set
+                         bothSets = TRUE ) # Return both training and test sets
+ # Extract train data
+ train_dat <- split_dat[[2]]
+ # Extract test data
+ test_dat <- split_dat[[1]]
+
+# Check size
+nrow(train_dat)
+# Ensure YearsRemaining is numeric
+train_dat$YearsRemaining <- as.numeric(as.character(train_dat$YearsRemaining))
+
+
+linear <- lm(YearsRemaining ~ Age + Pts, train_dat)
+summary(linear)
+
+preds <- predict(linear, test_dat)
+t <- table(preds, test_dat$YearsRemaining) # Create table
+confusionMatrix(t, positive = "TOR") # Produce confusion matrix
 
 ```
+
+
+
+
+
 
