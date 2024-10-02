@@ -195,9 +195,9 @@ train_dataRB <- train_data[train_data$Pos == 'RB',]
 train_dataRB<- train_dataRB %>% ungroup() %>% select(YearsRemaining,Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal)
 
 test_dataRB <- test_data[test_data$Pos == 'RB',]
-test_dataRB<- test_dataRB %>% ungroup() %>% select(YearsRemaining, Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal)
+test_dataRB<- test_dataRB %>% ungroup() %>% select(Season, YearsRemaining, Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal)
 
-# linearRB <- lm(YearsRemaining ~ ., train_dataRB)
+linearRB <- lm(YearsRemaining ~ ., train_dataRB)
 # 
 # 
 # # Get predictions with 95% confidence intervals
@@ -207,8 +207,10 @@ test_dataRB<- test_dataRB %>% ungroup() %>% select(YearsRemaining, Age, G, GS, A
 # intervals$upp <- predictions + 2
 # intervals_1 <- ifelse(test_dataRB$YearsRemaining >= intervals$lwr & test_dataRB$YearsRemaining <= intervals$upp, 1, 0)
 
-
+summary(linearRB)
 ```
+
+The significant factors at 5% were Age, Games, Touchdowns, Points and Concussion Total. These will be the features to use in random effects.
 
 ```{r}
 library(caret)
@@ -281,18 +283,25 @@ accuracy <- mean(test_pred == test_dataRB$ThreeYrLeft)
 
 ```{r Random Effects}
 library(lme4)
-pos_data <- final %>% ungroup() %>% select(Season, Age, Pos, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal, YearsRemaining)
-position <- lmer(YearsRemaining ~ . + (1|Pos), data = pos_data)
+pos_data <- final %>% ungroup() %>% select(Age, Pos, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal, YearsRemaining)
+plot( pos_data$Age, pos_data$YearsRemaining)
+plot( pos_data$G, pos_data$YearsRemaining)
+plot( pos_data$ConcussionTotal, pos_data$YearsRemaining)
+
+
+
+
+position <- lmer(YearsRemaining ~ Age+ G+ ConcussionTotal+TotalInjuryCount+GS+ (1|Pos), data = pos_data)
 summary(position)
 random_effects = ranef(position)
 ranef_df <-  data.frame(
   int = random_effects$Pos$`(Intercept)`,
   pos = rownames(random_effects$Pos)
 )
-
+performance::r2(position)
 ggplot(ranef_df, aes(x=int, y=reorder(pos, int))) +
   geom_point() + 
-  labs(x= "intercept", y="player") +
+  labs(x= "intercept", y="pos") +
   theme_minimal()
 ```
 
