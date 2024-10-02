@@ -83,8 +83,20 @@ sort(unique(seasons$Pos))
 
 ```
 
+<<<<<<< HEAD
+```{r}
+unique(all_injuries$Team)
+unique(seasons$Tm)
 
+  
+
+```
+
+```
+
+```
 ```{r Clean Team Col}
+ "df8d21cb55cec0801ca51a6f5319bec49bd5909f"
 
 seasons$Team <- seasons$Tm
 
@@ -106,7 +118,6 @@ for (i in 1:length(patterns)) {
 }
 
 head(all_injuries)
-
 ```
 
 
