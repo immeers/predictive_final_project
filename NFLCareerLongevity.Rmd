@@ -174,37 +174,121 @@ final[final$LastName == 'Folk',]
 kickers_final <- final[final$Pos == 'K',]
 final <- final[final$Pos != 'K',] %>% select(-FGM, -FGA)
 summary(final)
+
+
+final_1 <- final
+final_1$ThreeYrLeft <- ifelse(final_1$YearsRemaining >= 3, 1 ,0)
+final_1 <- final_1 %>% select(-YearsRemaining)
 ```
 
 ```{r}
-library(splitstackshape)
-set.seed(123456) # Set seed
-# Perform stratified sampling
- split_dat <- stratified(final, # Set dataset
-                         group = c("YearsRemaining", "FirstName", "LastName", "Pos"), # Set variables to use for stratification
-                         size = 0.2,  # Set size of test set
-                         bothSets = TRUE ) # Return both training and test sets
- # Extract train data
- train_dat <- split_dat[[2]]
- # Extract test data
- test_dat <- split_dat[[1]]
+library(caret)
 
-# Check size
-nrow(train_dat)
+set.seed(123)
+train_index <- createDataPartition(final$YearsRemaining, p = 0.8, list = FALSE)
+train_data <- final[train_index, ]
+test_data <- final[-train_index, ]
+
+# Check the dimensions
+dim(train_data)
+dim(test_data)
+
+
 # Ensure YearsRemaining is numeric
-train_dat$YearsRemaining <- as.numeric(as.character(train_dat$YearsRemaining))
+train_data$YearsRemaining <- as.numeric(as.character(train_data$YearsRemaining))
+train_data$YearsRemaining <- as.numeric(as.character(train_data$YearsRemaining))
+
+names(final)
+
+train_dataRB <- train_data[train_data$Pos == 'RB',] 
+train_dataRB<- train_dataRB %>% ungroup() %>% select(YearsRemaining,Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal)
+
+test_dataRB <- test_data[test_data$Pos == 'RB',]
+test_dataRB<- test_dataRB %>% ungroup() %>% select(YearsRemaining, Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal)
+
+linearRB <- lm(YearsRemaining ~ ., train_dataRB)
 
 
-linear <- lm(YearsRemaining ~ Age + Pts, train_dat)
-summary(linear)
+# Get predictions with 95% confidence intervals
+predictions <- predict(linearRB, newdata = test_dataRB)
+intervals <- predictions
+intervals$lwr <- predictions - 2
+intervals$upp <- predictions + 2
+intervals_1 <- ifelse(test_dataRB$YearsRemaining >= intervals$lwr & test_dataRB$YearsRemaining <= intervals$upp, 1, 0)
 
-preds <- predict(linear, test_dat)
-t <- table(preds, test_dat$YearsRemaining) # Create table
-confusionMatrix(t, positive = "TOR") # Produce confusion matrix
+
+```
+
+```{r}
+library(caret)
+
+set.seed(123)
+train_index <- createDataPartition(final_1$ThreeYrLeft, p = 0.8, list = FALSE)
+train_data <- final_1[train_index, ]
+test_data <- final_1[-train_index, ]
+
+# Check the dimensions
+dim(train_data)
+dim(test_data)
+
+
+# Ensure as.factor(train_data$FiveYrLeft)
+train_data$ThreeYrLeft <- as.numeric(train_data$ThreeYrLeft)
+test_data$ThreeYrLeft <- as.numeric(test_data$ThreeYrLeft)
+
+names(final)
+
+train_dataRB <- train_data[train_data$Pos == 'RB',] 
+train_dataRB<- train_dataRB %>% ungroup() %>% select(ThreeYrLeft,Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal)
+
+test_dataRB <- test_data[test_data$Pos == 'RB',]
+test_dataRB<- test_dataRB %>% ungroup() %>% select(ThreeYrLeft, Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal)
+
+linearRB <- glm(ThreeYrLeft ~ ., train_dataRB, family = "binomial")
+summary(linearRB)
+#AIC: 1290.1
+```
+Our first model is a linear model for RB using all features and of those features Age, Pts Scored, TD Scored and Games Played were significant. This model had an AIC of 1290.1. Next we ran a mixed effects linear model using the significant factors.
+
+
+```{r}
+
+linearRB1 <- glm(ThreeYrLeft ~ Age * Pts * AllTD*G, train_dataRB, family = "binomial")
+summary(linearRB1)
+#AIC: 1257.7
+
+predictions <- predict(linearRB1, newdata = test_dataRB, type = "response")
+
+
+#Threshold Testing
+curr = 0
+for (i in seq(0.3, 0.7, by = 0.01)){
+  test_pred <- ifelse(is.na(predictions), NA, ifelse(predictions > i, 1, 0))
+  
+  accuracy <- mean(test_pred == test_dataRB$ThreeYrLeft)
+  
+  
+  if (accuracy > curr){
+    print(accuracy)
+    best = c(i, accuracy)
+    curr = accuracy
+  }
+ 
+}
+
+test_pred <- ifelse(is.na(predictions), NA, ifelse(predictions > best[1], 1, 0))
+conf_matrix <- table(test_pred, test_dataRB$ThreeYrLeft)
+
+# Calculate metrics
+precision <- conf_matrix[2, 2] / sum(conf_matrix[2, ])
+recall <- conf_matrix[2, 2] / sum(conf_matrix[, 2])
+f1_score <- 2 * (precision * recall) / (precision + recall)
+accuracy <- mean(test_pred == test_dataRB$ThreeYrLeft)
 
 ```
 
 
+```
 
 
 
