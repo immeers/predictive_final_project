@@ -306,7 +306,7 @@ summary(logisticWR)
 logisticWR1 <- glm(ThreeYrLeft ~ Age * Pts * AllTD*G, train_dataWR, family = "binomial")
 summary(logisticWR1)
 #AIC: 1963.4
-
+ 
 predictions <- predict(logisticWR1, newdata = test_dataWR, type = "response")
 
 #Threshold Testing
