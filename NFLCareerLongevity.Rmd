@@ -341,8 +341,13 @@ test_dataWR <- test_dataWR %>% ungroup() %>% select(ThreeYrLeft, Age, G, GS, All
 
 logisticWR <- glm(ThreeYrLeft ~ ., train_dataWR, family = "binomial")
 summary(logisticWR)
+
 #AIC of 2034.7
+
+sjPlot::plot_model(logisticWR, type ="pred")
 ```
+The plot is the same concept as the prediction model we ran in line 271, just adapted to wide receivers.
+
 Of the features used in our WR logistic regression Age, Games Played, Games Started, TD Scored and Points Scored were all significant at the 5% level so we will used these in a mixed effects model.
 
 ```{r WR Mixed Effects}
