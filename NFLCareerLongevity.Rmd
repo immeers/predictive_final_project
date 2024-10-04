@@ -183,10 +183,25 @@ final_1$ThreeYrLeft <- ifelse(final_1$YearsRemaining >= 3, 1 ,0)
 final_1 <- final_1 %>% select(-YearsRemaining)
 ```
 
+```{r Variable Exploration}
+final %>% ungroup() %>%
+  dplyr::select(YearsRemaining ,Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal) %>%
+  pivot_longer(cols = -YearsRemaining) %>% 
+  # Plot every value against whiffs
+  ggplot(aes(value, YearsRemaining)) +
+  geom_point() +
+  
+  geom_smooth(method = "lm") +
+  # Put each variable into its own plot:
+  facet_wrap(vars(name), scales = "free") + theme_minimal()
+
+```
+Age looks like it will be the best factor to predict years remaining as the trend line shows a marginal negative correlation, meaning as age increases the number of years remaining you have decreases.
 ```{r}
 library(caret)
 
 set.seed(123)
+finalRB <- 
 train_index <- createDataPartition(final$YearsRemaining, p = 0.8, list = FALSE)
 train_data <- final[train_index, ]
 test_data <- final[-train_index, ]
@@ -223,47 +238,52 @@ summary(linearRB)
 
 The significant factors at 5% were Age, Games, Touchdowns, Points and Concussion Total. These will be the features to use in random effects.
 
-```{r}
+```{r RB Logistic }
 library(caret)
 
 set.seed(123)
-train_index <- createDataPartition(final_1$ThreeYrLeft, p = 0.8, list = FALSE)
-train_data <- final_1[train_index, ]
-test_data <- final_1[-train_index, ]
+
+finalRB <- final_1[final_1$Pos == 'RB',]
+
+train_index <- createDataPartition(finalRB$ThreeYrLeft, p = 0.8, list = FALSE)
+train_dataRB <- finalRB[train_index, ]
+test_dataRB <- finalRB[-train_index, ]
 
 # Check the dimensions
-dim(train_data)
-dim(test_data)
+dim(train_dataRB)
+dim(test_dataRB)
 
 
 # Ensure as.factor(train_data$FiveYrLeft)
-train_data$ThreeYrLeft <- as.numeric(train_data$ThreeYrLeft)
-test_data$ThreeYrLeft <- as.numeric(test_data$ThreeYrLeft)
+train_dataRB$ThreeYrLeft <- as.numeric(train_dataRB$ThreeYrLeft)
+test_dataRB$ThreeYrLeft <- as.numeric(test_dataRB$ThreeYrLeft)
 
 names(final)
 
-train_dataRB <- train_data[train_data$Pos == 'RB',] 
 train_dataRB<- train_dataRB %>% ungroup() %>% select(ThreeYrLeft,Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal)
 
-test_dataRB <- test_data[test_data$Pos == 'RB',]
 test_dataRB<- test_dataRB %>% ungroup() %>% select(ThreeYrLeft, Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal)
 
 logisticRB <- glm(ThreeYrLeft ~ ., train_dataRB, family = "binomial")
 summary(logisticRB)
-#AIC: 1290.1
+#AIC: 1329.6
 ```
-Our first model is a linear model for RB using all features and of those features Age, Pts Scored, TD Scored and Games Played were significant. This model had an AIC of 1290.1. Next we ran a mixed effects linear model using the significant factors.
+Our first model is a linear model for RB using all features and of those features Age, Pts Scored, TD Scored and Games Played were significant. This model had an AIC of 1330. Next we ran a mixed effects linear model using the significant factors.
 
 
-```{r}
+```{r RB Mixed Effects}
 
-logisticRB1 <- glm(ThreeYrLeft ~ Age * Pts * AllTD*G, train_dataRB, family = "binomial")
+logisticRB1 <- glm(ThreeYrLeft ~ Age +  G * Pts * AllTD, train_dataRB, family = "binomial")
 summary(logisticRB1)
-#AIC: 1257.7
+#AIC: 1286
 
 predictions <- predict(logisticRB1, newdata = test_dataRB, type = "response")
 
+```
+In the interaction model, only two variables appeared significant at the 5% level. These were Games Played and THe interaction between Age and Games Played.
 
+
+```{r}
 #Threshold Testing
 curr = 0
 for (i in seq(0.3, 0.7, by = 0.01)){
@@ -290,24 +310,46 @@ f1_score <- 2 * (precision * recall) / (precision + recall)
 accuracy <- mean(test_pred == test_dataRB$ThreeYrLeft)
 
 ```
+Our accuracy for this model was 70% meaning that 70/100 samples predicted correctly whether this athlete will retire in the next 3 years or not
 
 WR Accuracy Model
-```{r}
-train_dataWR <- train_data[train_data$Pos == 'WR',] 
+```{r WR Logistic }
+
+finalWR <- final_1[final_1$Pos == 'WR',]
+
+train_index <- createDataPartition(finalWR$ThreeYrLeft, p = 0.8, list = FALSE)
+train_dataWR <- finalWR[train_index, ]
+test_dataWR <- finalWR[-train_index, ]
+
+# Check the dimensions
+dim(train_dataWR)
+dim(test_dataWR)
+
+
+# Ensure as.factor(train_data$FiveYrLeft)
+train_dataWR$ThreeYrLeft <- as.numeric(train_dataWR$ThreeYrLeft)
+test_dataWR$ThreeYrLeft <- as.numeric(test_dataWR$ThreeYrLeft)
+
 train_dataWR<- train_dataWR %>% ungroup() %>% select(ThreeYrLeft,Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal)
 
-test_dataWR <- test_data[test_data$Pos == 'WR',]
 test_dataWR <- test_dataWR %>% ungroup() %>% select(ThreeYrLeft, Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal)
 
 logisticWR <- glm(ThreeYrLeft ~ ., train_dataWR, family = "binomial")
 summary(logisticWR)
-#AIC of 2072.6
+#AIC of 2034.7
+```
+Of the features used in our WR logistic regression Age, Games Played, Games Started, TD Scored and Points Scored were all significant at the 5% level so we will used these in a mixed effects model.
 
-logisticWR1 <- glm(ThreeYrLeft ~ Age * Pts * AllTD*G, train_dataWR, family = "binomial")
+```{r WR Mixed Effects}
+logisticWR1 <- glm(ThreeYrLeft ~ Age * Pts * AllTD * G * GS, train_dataWR, family = "binomial")
 summary(logisticWR1)
-#AIC: 1963.4
+#AIC: 1947.4
  
 predictions <- predict(logisticWR1, newdata = test_dataWR, type = "response")
+```
+Age and the interaction between Age, Points, Touchdowns and Games were significant at 5%.
+
+```{r}
 
 #Threshold Testing
 curr = 0
@@ -318,7 +360,6 @@ for (i in seq(0.3, 0.7, by = 0.01)){
   
   
   if (accuracy > curr){
-    print(accuracy)
     best = c(i, accuracy)
     curr = accuracy
   }
@@ -335,13 +376,12 @@ f1_score <- 2 * (precision * recall) / (precision + recall)
 accuracy <- mean(test_pred == test_dataWR$ThreeYrLeft)
 accuracy
 ```
+After threshold testing, our best model was 67% accurate meaning 67/100 samples were predicted correctly on whether they will retire in the next 3 years.
+
 
 ```{r Random Effects}
 library(lme4)
 pos_data <- final %>% ungroup() %>% select(Age, Pos, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal, YearsRemaining)
-plot( pos_data$Age, pos_data$YearsRemaining)
-plot( pos_data$G, pos_data$YearsRemaining)
-plot( pos_data$ConcussionTotal, pos_data$YearsRemaining)
 
 
 
