@@ -182,6 +182,7 @@ final$ThreeYrLeft <- ifelse(final$YearsRemaining >= 3, 1 ,0)
 final_1$ThreeYrLeft <- ifelse(final_1$YearsRemaining >= 3, 1 ,0)
 final_1 <- final_1 %>% select(-YearsRemaining)
 ```
+ThreeYearsLeft is 1, if you have 3 or more years left in the NFL and 0 if you have less than 3 years
 
 ```{r Variable Exploration}
 final %>% ungroup() %>%
@@ -266,6 +267,9 @@ test_dataRB<- test_dataRB %>% ungroup() %>% select(ThreeYrLeft, Age, G, GS, AllT
 
 logisticRB <- glm(ThreeYrLeft ~ ., train_dataRB, family = "binomial")
 summary(logisticRB)
+
+sjPlot::plot_model(logisticRB, type ="pred") #part of logistic regression curve
+
 #AIC: 1329.6
 ```
 Our first model is a linear model for RB using all features and of those features Age, Pts Scored, TD Scored and Games Played were significant. This model had an AIC of 1330. Next we ran a mixed effects linear model using the significant factors.
@@ -302,6 +306,7 @@ for (i in seq(0.3, 0.7, by = 0.01)){
 
 test_pred <- ifelse(is.na(predictions), NA, ifelse(predictions > best[1], 1, 0))
 conf_matrix <- table(test_pred, test_dataRB$ThreeYrLeft)
+
 
 # Calculate metrics
 precision <- conf_matrix[2, 2] / sum(conf_matrix[2, ])
