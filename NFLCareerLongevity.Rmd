@@ -83,18 +83,6 @@ sort(unique(seasons$Pos))
 
 ```
 
-<<<<<<< HEAD
-```{r}
-unique(all_injuries$Team)
-unique(seasons$Tm)
-
-  
-
-```
-
-```
-
-```
 ```{r Clean Team Col}
  "df8d21cb55cec0801ca51a6f5319bec49bd5909f"
 
@@ -161,6 +149,21 @@ final <- final %>% group_by(FirstName, LastName, Pos) %>%
 
 head(final)
 
+final_all <-  final 
+
+#filter positions that have very few samples
+too_few <- final_all %>% group_by(Pos) %>% count(Pos)%>% filter(n < 100) %>% select(Pos) %>% ungroup() %>% pull(Pos)
+
+#remove low sample size pos
+final_all <- final_all %>% filter(!(Pos %in% too_few))
+
+#table of average career lengths
+average_len_careers <- final_all %>% group_by(FirstName, LastName, Pos) %>%
+  arrange(Season)%>% mutate(careerLen = max(Season) - min(Season)) %>% ungroup() %>% select(Pos, careerLen) %>% group_by(Pos) %>% mutate(avgLen = mean(careerLen)) %>% distinct(Pos, avgLen) %>% arrange(desc(avgLen)) 
+
+average_len_careers$avgLen <- round(average_len_careers$avgLen, 2)
+
+
 
 #drop players that moved around a lot
 final[final$Team != '3TM',]
@@ -172,11 +175,10 @@ final[final$LastName == 'Folk',]
 
 
 kickers_final <- final[final$Pos == 'K',]
-final <- final[final$Pos != 'K',] %>% select(-FGM, -FGA)
-summary(final)
-
-
 final_1 <- final
+final_1 <- final[final$Pos != 'K',] %>% select(-FGM, -FGA)
+
+
 final$ThreeYrLeft <- ifelse(final$YearsRemaining >= 3, 1 ,0)
 
 final_1$ThreeYrLeft <- ifelse(final_1$YearsRemaining >= 3, 1 ,0)
@@ -391,25 +393,56 @@ After threshold testing, our best model was 67% accurate meaning 67/100 samples 
 
 ```{r Random Effects}
 library(lme4)
-pos_data <- final %>% ungroup() %>% select(Age, Pos, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal, YearsRemaining)
+pos_data <- final_all %>% ungroup() %>% select(Age, Pos, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal, YearsRemaining)
 
 
 
 
-position <- lmer(YearsRemaining ~ Age+ G+ ConcussionTotal+TotalInjuryCount+GS+ (1|Pos), data = pos_data)
-summary(position)
-random_effects = ranef(position)
+position_age <- lmer(YearsRemaining ~ Age + (1|Pos), data = pos_data)
+summary(position_age)
+random_effects = ranef(position_age)
 ranef_df <-  data.frame(
   int = random_effects$Pos$`(Intercept)`,
   pos = rownames(random_effects$Pos)
 )
-performance::r2(position)
+performance::r2(position_age)
 ggplot(ranef_df, aes(x=int, y=reorder(pos, int))) +
   geom_point() + 
-  labs(x= "intercept", y="pos") +
+  labs(x= "intercept", y="pos", title = 'Effect of Position on Years Remaining', subtitle = 'lm ~ Age') +
   theme_minimal()
 ```
+Age: for every 0.15 years older, 1 year decrease in number of years remaining
+
+```{r Games}
+scaled <- data.frame(cbind(scale(pos_data[,c('Age', 'G', 'YearsRemaining')]), pos_data$Pos)) %>% rename( 'Pos'='V4')
+scaled$Age <- as.numeric(scaled$Age)
+scaled$YearsRemaining <- as.numeric(scaled$YearsRemaining)
+scaled$G <- as.numeric(scaled$G)
 
 
 
+position_g <- lmer(YearsRemaining ~ G * Age + (1|Pos), data = scaled)
+summary(position_g)
+random_effects = ranef(position_g)
+ranef_df <-  data.frame(
+  int = random_effects$Pos$`(Intercept)`,
+  pos = rownames(random_effects$Pos)
+)
+performance::r2(position_g)
+ggplot(ranef_df, aes(x=int, y=reorder(pos, int))) +
+  geom_point() + 
+  labs(x= "intercept", y="pos", title = 'Effect of Position on Years Remaining', subtitle = 'lm ~ Age * G') +
+  theme_minimal()
+```
+Age is the greatest contributor to this model as it has highest t value. From the model you can see a negative correlation between age and years remaining. As age increases by 1 year, number of years remaining decreases by 0.23 years.
+
+Number of games has a relatively small impact on the model. It has a small positive correlation with years remaining, meaning for every game played, there is a 0.02 increase in years remaining. Depending on how you interpret the model this makes sense as if you are a better/more active players, maybe you are more likely to keep playing vs someone who doesn't get a lot of reps and retires early.
+
+The interaction between Games and Age has a relatively small impact on the model. It has a small negative correlation meaning that for every 1 year increase in age, the effect of number of games played on years remaining decreases by 0.028.
+
+```{r Compare to average career lengths}
+library(DT)
+datatable(average_len_careers)
+
+```
 
