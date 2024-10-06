@@ -200,46 +200,6 @@ final %>% ungroup() %>%
 
 ```
 Age looks like it will be the best factor to predict years remaining as the trend line shows a marginal negative correlation, meaning as age increases the number of years remaining you have decreases.
-```{r}
-library(caret)
-
-set.seed(123)
-finalRB <- 
-train_index <- createDataPartition(final$YearsRemaining, p = 0.8, list = FALSE)
-train_data <- final[train_index, ]
-test_data <- final[-train_index, ]
-
-# Check the dimensions
-dim(train_data)
-dim(test_data)
-
-
-# Ensure YearsRemaining is numeric
-train_data$YearsRemaining <- as.numeric(as.character(train_data$YearsRemaining))
-train_data$YearsRemaining <- as.numeric(as.character(train_data$YearsRemaining))
-
-names(final)
-
-train_dataRB <- train_data[train_data$Pos == 'RB',] 
-train_dataRB<- train_dataRB %>% ungroup() %>% select(YearsRemaining,Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal)
-
-test_dataRB <- test_data[test_data$Pos == 'RB',]
-test_dataRB<- test_dataRB %>% ungroup() %>% select(Season, YearsRemaining, Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal)
-
-linearRB <- lm(YearsRemaining ~ ., train_dataRB)
-# 
-# 
-# # Get predictions with 95% confidence intervals
-# predictions <- predict(linearRB, newdata = test_dataRB)
-# intervals <- predictions
-# intervals$lwr <- predictions - 2
-# intervals$upp <- predictions + 2
-# intervals_1 <- ifelse(test_dataRB$YearsRemaining >= intervals$lwr & test_dataRB$YearsRemaining <= intervals$upp, 1, 0)
-
-summary(linearRB)
-```
-
-The significant factors at 5% were Age, Games, Touchdowns, Points and Concussion Total. These will be the features to use in random effects.
 
 ```{r RB Logistic }
 library(caret)
@@ -261,7 +221,6 @@ dim(test_dataRB)
 train_dataRB$ThreeYrLeft <- as.numeric(train_dataRB$ThreeYrLeft)
 test_dataRB$ThreeYrLeft <- as.numeric(test_dataRB$ThreeYrLeft)
 
-names(final)
 
 train_dataRB<- train_dataRB %>% ungroup() %>% select(ThreeYrLeft,Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal)
 
@@ -279,9 +238,11 @@ Our first model is a linear model for RB using all features and of those feature
 
 ```{r RB Mixed Effects}
 
-logisticRB1 <- glm(ThreeYrLeft ~ Age +  G * Pts * AllTD, train_dataRB, family = "binomial")
+logisticRB1 <- glm(ThreeYrLeft ~ Age *  G  * AllTD, train_dataRB, family = "binomial")
 summary(logisticRB1)
 #AIC: 1286
+
+sjPlot::plot_model(logisticRB1, type ="pred")
 
 predictions <- predict(logisticRB1, newdata = test_dataRB, type = "response")
 
