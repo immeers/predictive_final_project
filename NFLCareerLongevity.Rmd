@@ -2,23 +2,185 @@
 title: "NFL Player Career Longevity"
 author: "Imogen, Adam and Nolan"
 date: "`r Sys.Date()`"
-output: html_document
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-library(tidyverse)
-knitr::opts_chunk$set(echo = TRUE)
-status <- read.csv("status.csv")
-
-```
-
-```{r}
 library(dplyr)
 library(tidyverse)
+library(caret)
+library(lme4)
+library(tidyverse)
+library(reticulate)
+knitr::opts_chunk$set(echo = TRUE)
+
 ```
 
+## Abstract
+In this research project, we will attempt to forecast NFL players' retirement dates, mainly on the basis of their positions. We will use logistic regression to predict the probability of retirement within the next three years and a random effects model to see the effect of different positions on years remaining in the league. These models will take into account variables like age, games played, number of concussions, and number of total injuries. We will look into how these variables affect the probability of a player retiring within the next 3 years or not, as well as how they affect positions differently regarding the number of years they have left in the NFL. This report will also record the difficulties we faced with data cleaning and merging. Due to the lack of full data, we will be sampling all data from years 2010-2024 so better account for modern injury technology Our goal is to assess the factors that relate to “premature retirements.” We hypothesize that the various positions are what affect NFL careers' length. This, in turn, could help teams and analysts predict and plan for a better player turnover.
 
-```{r}
+## Introduction
+It’s no secret that, while the NFL is an exciting league, there is a struggle with career longevity. Star players such as Andrew Luck and Calvin Johnson retired before they even turned 30-years-old. In addition to this, several star players missed key playing time in what would be their prime years due to injuries. Teams and analysts need software that can predict when one of their players might retire (either medically or by choice) based on their current workload and performance. We will create this by first attempting to understand the factors that influence NFL players' career longevity. Position-specific demands, injury risks, and player workload all play a significant role in determining the length of a player’s career. We will analyze historical data in efforts to identify patterns that may help predict the retirement year of a player. In this project, we will use data from 2010 to 2024 to develop a predictive model for retirement timelines across different NFL positions. 
+
+## Proposed Solution and Methodology
+We will gather seasonal data at a player level of detail from Kaggle (in game stats) and the Injury Report section of the NFL website. We will then:
+1. Clean our data by normalizing names of positions and teams, and removing years that have inconsistent data.
+2. Aggregate our two data sources via the creation of a player Id.
+3. Make the player-season data cumulative so that each row is a different data point, instead of having to worry about stratified sampling or keeping track of individual time-series for every player's career when doing our train-test split.
+4. Explore our variables and summary statistics to see the quality of our predictors.
+5. Run our logistic and linear models by position and evaluate/tune for accuracy.
+
+
+## Data Acquisition
+### Webscraping for NFL Injury Reports
+
+```{python Injury Report Scrape, eval = FALSE}
+import bs4
+import requests
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import time
+import pandas as pd
+import itertools
+from ast import literal_eval
+import ast
+import math
+import re
+import matplotlib.pyplot as plt
+from difflib import SequenceMatcher
+from collections import Counter
+import collections
+import copy
+import random
+
+import warnings
+warnings.filterwarnings('ignore')
+
+pd.set_option('display.max_columns', None)
+pd.set_option('display.float_format', '{:.2f}'.format)
+urls_list = []
+
+def create_list_urls(urls, start):
+    
+    for y in range(start,start+1):
+        #create regular season urls
+        for w in range(1,18):
+            urls.append('https://www.nfl.com/injuries/league/' + str(y) + '/reg' + str(w))
+        
+        #create post season urls
+        for i in range(1,5):
+            urls.append('https://www.nfl.com/injuries/league/' + str(y) + '/post' + str(i))
+
+        #create pro season urls
+        urls.append('https://www.nfl.com/injuries/league/' + str(y) + '/pro1')    
+            
+def create_dfs():
+    counts = players_df.groupby(['Player', 'Season', 'Position', 'Team']).size().reset_index(name='TotalInjuryCount')
+    sorted_df = counts.sort_values(by='TotalInjuryCount', ascending=False)
+    sorted_df.to_csv('totalInjury.csv',mode='a', index=False)
+    injury_counts = players_df.groupby(['Player', 'Season', 'Position', 'Team', 'Injury']).size().unstack(fill_value=0).reset_index()
+
+
+
+    filtered_df = injury_counts.filter(like='Concussion' )
+    concussion_sum = filtered_df.sum(axis=1)
+    # Add the sum as a new column to the original DataFrame
+    filtered_df['ConcussionTotal'] = concussion_sum
+    merged_df = pd.concat([counts, filtered_df['ConcussionTotal']], axis=1)
+    concussion_sort = merged_df.sort_values(by='ConcussionTotal', ascending=False)
+    concussion_sort.to_csv('totalConcussion.csv',mode='a', index=False)
+
+    practice_counts = players_df.groupby(['Player', 'Season', 'Position', 'Team', 'Practice']).size().unstack(fill_value=0).reset_index()
+    practice_counts.drop(practice_counts.columns[4], axis=1, inplace=True)
+    practice_counts.to_csv('practice.csv',mode='a', index=False)
+
+    status_counts = players_df.groupby(['Player', 'Season', 'Position','Team', 'GameStatus']).size().unstack(fill_value=0).reset_index()
+    status_counts.drop(status_counts.columns[4], axis=1, inplace=True)
+    status_counts.to_csv('status.csv',mode='a', index=False)
+    
+def injury_data(url_list):
+    all_players = []
+    df_list = []
+    df = pd.DataFrame()
+    
+    for i in url_list:
+        print('Injuries from ' + i)
+        curr_season = re.search("\d\d\d\d", i).group()
+        try:
+            alpha = requests.get(i)
+            beta = bs4.BeautifulSoup(alpha.text)
+            tables = beta.findAll("table")
+            teams = beta.findAll("div", class_="d3-o-section-sub-title")
+            idx = 0
+
+            for table in tables:
+                if table.findParent("table") is None:
+                    tbody = table.find("tbody")
+                    for tr in tbody:
+                        try:
+                            td = tr.find_all("td") 
+                            rows = [tr.text.strip() for tr in td if tr is not None and len(tr) > 0]
+                            for i in rows:
+                                df_list.append(i) #at the player level
+                            df_list.append(curr_season)
+                            df_list.append(teams[idx].find("span").text)
+                            all_players.append(copy.copy(df_list))
+                            df_list = []
+                    
+                        except:
+                            pass
+                idx += 1        
+                        
+        except:
+            print("Error with url: " + i)
+        print(len(all_players))
+    return all_players
+        
+        
+for yr in range(2008, 2024):  
+    urls_list = []  
+    create_list_urls(urls_list, yr)
+    players_df = pd.DataFrame(injury_data(urls_list), columns = ['Player', 'Position', 'Injury', 'Practice', 'GameStatus', 'Season', 'Team'])
+    create_dfs()
+    r = random.uniform(1, 5)
+
+    print("Written to df. Waiting " + str(r))
+    time.sleep(60 * r)
+    saved = players_df
+    
+    
+    
+    
+def create_dfs():
+    counts = players_df.groupby(['Player', 'Season', 'Position', 'Team']).size().reset_index(name='TotalInjuryCount')
+    sorted_df = counts.sort_values(by='TotalInjuryCount', ascending=False)
+    sorted_df.to_csv('totalInjury.csv', index=False)
+    injury_counts = players_df.groupby(['Player', 'Season', 'Position', 'Team', 'Injury']).size().unstack(fill_value=0).reset_index()
+
+
+
+    filtered_df = injury_counts.filter(like='Concussion' )
+    concussion_sum = filtered_df.sum(axis=1)
+    # Add the sum as a new column to the original DataFrame
+    filtered_df['ConcussionTotal'] = concussion_sum
+    merged_df = pd.concat([counts, filtered_df['ConcussionTotal']], axis=1)
+    concussion_sort = merged_df.sort_values(by='ConcussionTotal', ascending=False)
+    concussion_sort.to_csv('totalConcussion.csv', index=False)
+
+    practice_counts = players_df.groupby(['Player', 'Season', 'Position', 'Team', 'Practice']).size().unstack(fill_value=0).reset_index()
+    practice_counts.drop(practice_counts.columns[4], axis=1, inplace=True)
+    practice_counts.to_csv('practice.csv', index=False)
+
+    status_counts = players_df.groupby(['Player', 'Season', 'Position','Team', 'GameStatus']).size().unstack(fill_value=0).reset_index()
+    status_counts.drop(status_counts.columns[4], axis=1, inplace=True)
+    status_counts.to_csv('status.csv', index=False)
+
+```
+
+### Kaggle Dataset
+
+```{r Read in Data}
 all_seasons <- read.csv("NFL Player Stats(1922 - 2022).csv")
 head(all_seasons)
 seasons <- all_seasons[all_seasons$Season >= 2006,] #only have injury data from 2006 onwards
@@ -26,6 +188,7 @@ seasons <- seasons %>%
   select(Tm, Season, Player, Age, Pos, G, GS, AllTD, Pts, FGM, FGA)
 head(seasons)
 dim(seasons)
+
 all_injuries <- read.csv("totalConcussion.csv") #injury and concussion by player and year
 all_injuries <-  all_injuries %>% separate(Player, into = c("FirstName", "LastName"), sep = " ")
 all_injuries <- all_injuries[all_injuries$Position != 'Position',]
@@ -36,8 +199,10 @@ seasons$LastName <- gsub("\\+$", "", seasons$LastName)
 seasons <-  seasons %>% mutate(AllTD = ifelse(is.na(AllTD),0, AllTD))
 
 
-```
 
+```
+## Data Cleaning
+### Positions
 
 ```{r Clean Position Col}
 seasons <- seasons %>%
@@ -77,14 +242,16 @@ all_injuries <- all_injuries[all_injuries$Position != "LS",]
 all_injuries <- all_injuries[all_injuries$Position != "KR",]
 all_injuries <- all_injuries[all_injuries$Position != "PR",]
 
+#theyre now equal
 sort(unique(all_injuries$Position))
 sort(unique(seasons$Pos))
 
 
-```
 
+
+```
+### Teams
 ```{r Clean Team Col}
- "df8d21cb55cec0801ca51a6f5319bec49bd5909f"
 
 seasons$Team <- seasons$Tm
 
@@ -105,9 +272,12 @@ for (i in 1:length(patterns)) {
   all_injuries$Team <- gsub(patterns[i], replacements[i], all_injuries$Team)
 }
 
+#theyre now equal
 head(all_injuries)
+head(seasons)
 ```
 
+### Merge on PlayerID
 
 ```{r Make the PlayerIDs}
 #make injury ID to merge
@@ -116,8 +286,6 @@ all_injuries$PlayerID <- paste0(paste0(paste0(substring(all_injuries$FirstName, 
 #make season ID to merge
 seasons$PlayerID <- paste0(paste0(paste0(substring(seasons$FirstName, 1, 1), seasons$LastName), seasons$Pos), seasons$Season)
 
-#make status ID to merge
-status$PlayerID <- paste0(paste0(paste0(substring(status$FirstName, 1, 1), status$LastName), status$Pos), status$Season)
 ```
 
 
@@ -134,7 +302,7 @@ head(joined)
 
 
 ```{r Make final dataset}
-#Making cumulative cols and response var
+#Making cumulative cols and response var, this way we wouldn't have to use stratified sampling to keep players together
 final <- joined
 final <- final %>%
   group_by(FirstName, LastName, Pos) %>%
@@ -143,14 +311,13 @@ final <- final %>%
          FGM = cumsum(FGM), FGA = cumsum((FGA)), ConcussionTotal = cumsum(ConcussionTotal), TotalInjuryCount = cumsum(TotalInjuryCount))
 
 
-#create response
+#create response var
 final <- final %>% group_by(FirstName, LastName, Pos) %>%
   arrange(Season)%>% mutate(YearsRemaining = max(Season) - Season)
 
-head(final)
-
 final_all <-  final 
 
+#All positions
 #filter positions that have very few samples
 too_few <- final_all %>% group_by(Pos) %>% count(Pos)%>% filter(n < 100) %>% select(Pos) %>% ungroup() %>% pull(Pos)
 
@@ -169,23 +336,27 @@ average_len_careers$avgLen <- round(average_len_careers$avgLen, 2)
 final[final$Team != '3TM',]
 final[final$Team != '2TM',]
 
-
-#look at individual
-final[final$LastName == 'Folk',]
-
-
+#separate out kickers because they have extra cols for field goals
 kickers_final <- final[final$Pos == 'K',]
 final_1 <- final
 final_1 <- final[final$Pos != 'K',] %>% select(-FGM, -FGA)
 
-
+#Create logistic outcome variable
+#1 = greater than and equal 3 years remaining
+#0 = less than 3 years remaining
 final$ThreeYrLeft <- ifelse(final$YearsRemaining >= 3, 1 ,0)
 
+#add logistic outcome to kicker-free dataset
 final_1$ThreeYrLeft <- ifelse(final_1$YearsRemaining >= 3, 1 ,0)
 final_1 <- final_1 %>% select(-YearsRemaining)
+
+#glimpse of data set
+final_1[final_1$LastName == 'Brady',]
 ```
 ThreeYearsLeft is 1, if you have 3 or more years left in the NFL and 0 if you have less than 3 years
 
+
+## Variable Exploration
 ```{r Variable Exploration}
 final %>% ungroup() %>%
   dplyr::select(YearsRemaining ,Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal) %>%
@@ -200,10 +371,13 @@ final %>% ungroup() %>%
 
 ```
 Age looks like it will be the best factor to predict years remaining as the trend line shows a marginal negative correlation, meaning as age increases the number of years remaining you have decreases.
+Pts looks like the second most effective variable, as points increases, years remaining in the NFL increases. Perhaps this is because more successful players last longer.
+
+All other variables looked like they would be pretty negligible predictors.
+
+##Logistic Model for RBs
 
 ```{r RB Logistic }
-library(caret)
-
 set.seed(123)
 
 finalRB <- final_1[final_1$Pos == 'RB',]
@@ -233,9 +407,33 @@ sjPlot::plot_model(logisticRB, type ="pred") #part of logistic regression curve
 
 #AIC: 1329.6
 ```
-Our first model is a linear model for RB using all features and of those features Age, Pts Scored, TD Scored and Games Played were significant. This model had an AIC of 1330. Next we ran a mixed effects linear model using the significant factors.
+Our first model is a logistic model for RB using all features and of those features Age, Pts Scored, TD Scored and Games Played were significant. 
+
+Age, Games and TD had negative coefficient so the as they increase, the odds of being in the league for 3 or more years decrease. Pts had a positive coefficient so as it increases, the odds of being in the league for 3 or more years increases.
+
+```{r Logistic Test}
+predictions <- predict(logisticRB, newdata = test_dataRB, type = "response")
+test_pred <- ifelse(is.na(predictions), NA, ifelse(predictions > 0.5, 1, 0))
+conf_matrix <- table(test_pred, test_dataRB$ThreeYrLeft)
+
+# Calculate metrics
+precision <- conf_matrix[2, 2] / sum(conf_matrix[2, ])
+recall <- conf_matrix[2, 2] / sum(conf_matrix[, 2])
+f1_score <- 2 * (precision * recall) / (precision + recall)
+accuracy <- mean(test_pred == test_dataRB$ThreeYrLeft)
 
 
+```
+Our basic logistic model has an overall accuracy of 69%.
+It has a precision of 0.6, meaning of the observations that had >= 3 years left, our model predicted 60% of them correctly.
+It has a recall of 0.1, 
+
+It has an F1 score of 0.17, which is a very low balanced metric of recall and precision indicating this is probably not a good model
+
+
+This model had an AIC of 1330. Next we ran a mixed effects linear model using the significant factors.
+
+## Logistic Model with Interaction for RBs
 ```{r RB Mixed Effects}
 
 logisticRB1 <- glm(ThreeYrLeft ~ Age *  G  * AllTD, train_dataRB, family = "binomial")
@@ -246,10 +444,9 @@ sjPlot::plot_model(logisticRB1, type ="pred")
 
 predictions <- predict(logisticRB1, newdata = test_dataRB, type = "response")
 
+
 ```
-In the interaction model, only two variables appeared significant at the 5% level. These were Games Played and THe interaction between Age and Games Played.
-
-
+Threshold testing to see if there is a better threshold than 0.5 for our logistic regression.
 ```{r}
 #Threshold Testing
 curr = 0
@@ -260,7 +457,6 @@ for (i in seq(0.3, 0.7, by = 0.01)){
   
   
   if (accuracy > curr){
-    print(accuracy)
     best = c(i, accuracy)
     curr = accuracy
   }
@@ -276,11 +472,15 @@ precision <- conf_matrix[2, 2] / sum(conf_matrix[2, ])
 recall <- conf_matrix[2, 2] / sum(conf_matrix[, 2])
 f1_score <- 2 * (precision * recall) / (precision + recall)
 accuracy <- mean(test_pred == test_dataRB$ThreeYrLeft)
-
+accuracy
 ```
-Our accuracy for this model was 70% meaning that 70/100 samples predicted correctly whether this athlete will retire in the next 3 years or not
+Our accuracy for this model was 70% meaning that 70/100 samples predicted correctly whether this athlete will retire in the next 3 years or not.
 
-WR Accuracy Model
+This model had a low recall of 0.14, 
+This model had a precision of 0.63, meaning that of the observations predicted as positive, 14% of them were correctly positive
+This model had a slightly higher F1 score of 0.23 than the previous model indicating a slightly better balance between recall and precision
+
+## Logistic Model for WRs
 ```{r WR Logistic }
 
 finalWR <- final_1[final_1$Pos == 'WR',]
@@ -309,10 +509,26 @@ summary(logisticWR)
 
 sjPlot::plot_model(logisticWR, type ="pred")
 ```
+```{r}
+predictions <- predict(logisticWR, newdata = test_dataWR, type = "response")
+test_pred <- ifelse(is.na(predictions), NA, ifelse(predictions > 0.5, 1, 0))
+conf_matrix <- table(test_pred, test_dataWR$ThreeYrLeft)
+
+# Calculate metrics
+precision <- conf_matrix[2, 2] / sum(conf_matrix[2, ])
+recall <- conf_matrix[2, 2] / sum(conf_matrix[, 2])
+f1_score <- 2 * (precision * recall) / (precision + recall)
+accuracy <- mean(test_pred == test_dataWR$ThreeYrLeft)
+accuracy
+```
+This model was 65% accurate
+
 The plot is the same concept as the prediction model we ran in line 271, just adapted to wide receivers.
 
 Of the features used in our WR logistic regression Age, Games Played, Games Started, TD Scored and Points Scored were all significant at the 5% level so we will used these in a mixed effects model.
 
+
+## Logistic Model with Interaction for WRs
 ```{r WR Mixed Effects}
 logisticWR1 <- glm(ThreeYrLeft ~ Age * Pts * AllTD * G * GS, train_dataWR, family = "binomial")
 summary(logisticWR1)
@@ -351,9 +567,8 @@ accuracy
 ```
 After threshold testing, our best model was 67% accurate meaning 67/100 samples were predicted correctly on whether they will retire in the next 3 years.
 
-
+## Linear Random Effects Model
 ```{r Random Effects}
-library(lme4)
 pos_data <- final_all %>% ungroup() %>% select(Age, Pos, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal, YearsRemaining)
 
 
@@ -374,6 +589,8 @@ ggplot(ranef_df, aes(x=int, y=reorder(pos, int))) +
 ```
 Age: for every 0.15 years older, 1 year decrease in number of years remaining
 
+
+## Linear Random Effects Model with Interaction
 ```{r Games}
 scaled <- data.frame(cbind(scale(pos_data[,c('Age', 'G', 'YearsRemaining')]), pos_data$Pos)) %>% rename( 'Pos'='V4')
 scaled$Age <- as.numeric(scaled$Age)
@@ -402,8 +619,12 @@ Number of games has a relatively small impact on the model. It has a small posit
 The interaction between Games and Age has a relatively small impact on the model. It has a small negative correlation meaning that for every 1 year increase in age, the effect of number of games played on years remaining decreases by 0.028.
 
 ```{r Compare to average career lengths}
-library(DT)
-datatable(average_len_careers)
+average_len_careers
 
 ```
 
+## Challenges and Limitations
+One of the challenges that we had to overcome during the data wrangling part of the process was the positions being very widespread. We had to combine the wide array of positions such as Left Cornerback, Right Cornerback, and safety positions into a defensive back position group to make running the model much easier. We had to do the same for the linebacker and defensive lineman position groups. There were also a few niche positions that we elected to remove from our dataset which were kick returner, punt returner, and long snapper because all of these positions are special teams only and the vast majority of the players that played in these roles were also listed at other position groups. Another challenge we had was combining the player injuries dataset and the player stats data set by the team names. This is because the team names were listed differently.
+
+
+## Conclusion
