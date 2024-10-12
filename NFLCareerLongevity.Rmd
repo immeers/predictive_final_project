@@ -424,26 +424,31 @@ sjPlot::plot_model(logisticRB, type ="pred") #part of logistic regression curve
 ```
 Our first model is a logistic model for RB using all features and of those features Age, Pts Scored, TD Scored and Games Played were significant. 
 
-Age, Games and TD had negative coefficient so the as they increase, the odds of being in the league for 3 or more years decrease. Pts had a positive coefficient so as it increases, the odds of being in the league for 3 or more years increases.
+Age, Games and TD had negative coefficient so that as they increase, the odds of being in the league for 3 or more years decrease. Pts had a positive coefficient so as it increases, the odds of being in the league for 3 or more years increases.
 
 ```{r Logistic Test}
 predictions <- predict(logisticRB, newdata = test_dataRB, type = "response")
 test_pred <- ifelse(is.na(predictions), NA, ifelse(predictions > 0.5, 1, 0))
 conf_matrix <- table(test_pred, test_dataRB$ThreeYrLeft)
-
+conf_matrix
 # Calculate metrics
 precision <- conf_matrix[2, 2] / sum(conf_matrix[2, ])
 recall <- conf_matrix[2, 2] / sum(conf_matrix[, 2])
 f1_score <- 2 * (precision * recall) / (precision + recall)
 accuracy <- mean(test_pred == test_dataRB$ThreeYrLeft)
-
+precision
+recall
+f1_score
+accuracy
 
 ```
 Our basic logistic model has an overall accuracy of 69%.
-It has a precision of 0.6, meaning of the observations that had >= 3 years left, our model predicted 60% of them correctly.
-It has a recall of 0.1, 
 
-It has an F1 score of 0.17, which is a very low balanced metric of recall and precision indicating this is probably not a good model
+It has a precision of 0.6, meaning of the observations that had >= 3 years left, our model predicted 60% of them correctly.
+
+It has a recall of 0.1, which is very low, meaning that from all observations, the model only correctly identified those players that had >= 3 years left 10% of the time.
+
+It has an F1 score of 0.17, which is a very low balanced metric of recall and precision indicating this is probably not a good model, so instead we will try a model with interaction
 
 
 This model had an AIC of 1330. Next we ran a mixed effects linear model using the significant factors.
@@ -642,4 +647,9 @@ average_len_careers
 One of the challenges that we had to overcome during the data wrangling part of the process was the positions being very widespread. We had to combine the wide array of positions such as Left Cornerback, Right Cornerback, and safety positions into a defensive back position group to make running the model much easier. We had to do the same for the linebacker and defensive lineman position groups. There were also a few niche positions that we elected to remove from our dataset which were kick returner, punt returner, and long snapper because all of these positions are special teams only and the vast majority of the players that played in these roles were also listed at other position groups. Another challenge we had was combining the player injuries dataset and the player stats data set by the team names. This is because the team names were listed differently.
 
 
-## Conclusion
+## Conclusion and Insights
+In conclusion, it proved to be harder than we initially thought to predict retirement with great accuracy. Although our models had ~60% accuracy, they had low F1 and recall scores indicating they were not that good at identifying players that had longer left in their careers. However, as our project we were looking at retirement so it is good to note that our models were much better at identifying those players that were close to retirement. This would be useful for coaches as if a player flags that they have less time left in the NFL, coaches could either take measures to help prolong that player's career such as minute limits, or know that they have to start searching for a replacement.
+
+From our findings, it is obvious that Age is the most influential factor to retirement. However, depending on the positions the number of games played and touchdowns scored also proved to be significant. Whilst number of touchdowns is a stat that will always tried to be maximized in the NFL, the number of games played could be controlled by a coach as a means to increase the time left for a player in particular for RBs.
+
+When looking at positions, we found that quarterbacks and kickers have the "highest baseline" for years remaining in the league from our linear model, which supported the statistic that they have the highest value for average career length. Of the remaining positions (not including outliers because of too few samples), defensive ends and linebackers had the "lowest baseline" for years remaining meaning they have the shortest careers. This information could be useful to coaches in order to determine the frequency by which they need to recruit new players to replace those that retired.
