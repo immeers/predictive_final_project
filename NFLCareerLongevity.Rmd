@@ -373,7 +373,22 @@ final %>% ungroup() %>%
 Age looks like it will be the best factor to predict years remaining as the trend line shows a marginal negative correlation, meaning as age increases the number of years remaining you have decreases.
 Pts looks like the second most effective variable, as points increases, years remaining in the NFL increases. Perhaps this is because more successful players last longer.
 
-All other variables looked like they would be pretty negligible predictors.
+All other variables look like they will be pretty negligible predictors.
+
+```{r}
+graphing_data <- final_1 %>% ungroup() %>%
+  dplyr::select(ThreeYrLeft, Age) 
+graphing_data$ThreeYrLeft = as.factor(graphing_data$ThreeYrLeft)
+graphing_data %>%
+  pivot_longer(cols = -ThreeYrLeft) %>% 
+  ggplot(aes(x = value, fill =ThreeYrLeft)) +
+  geom_density() +
+  theme_minimal() +
+  scale_fill_manual(values = c("0" = "red", "1" = "blue"), 
+                    labels = c("< 3 Years Left", ">= 3 Years Left")) +
+  labs(title = "Density Plot of Age Variable")
+```
+As Age looked to be the most descriptive variable from our scatterplots, we chose to plot Age as a density plot to see if there would be a separation between the Age of players with greater than/less than 3 years remaining. From the plot, you can see there is not an exact separation, however the density of ages 27 years and older is greater for those that have less than 3 years left, which supports the idea that older players will have less time to retirement.
 
 ##Logistic Model for RBs
 
