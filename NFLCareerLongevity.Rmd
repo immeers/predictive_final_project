@@ -203,7 +203,7 @@ seasons <-  seasons %>% mutate(AllTD = ifelse(is.na(AllTD),0, AllTD))
 ## Data Cleaning
 ### Positions
 
-```{r Clean Position Col}
+```{r Clean Position Col, warning = FALSE}
 seasons <- seasons %>%
   mutate(Pos = ifelse(Pos %in% c("LCB", "CB", "RCB", "RCB/LCB", "DB/RCB", "RCB/LCB/DB", "LCB/RCB", "DB/LCB", "RCB/DB",
                                  "SS", "FS", "SS/FS", "LCB/FS", "DB/FS", "FS/SS", "SS/RLB", "S", "DB"), "DB", Pos))
@@ -248,7 +248,7 @@ sort(unique(seasons$Pos))
 
 ```
 ### Teams
-```{r Clean Team Col}
+```{r Clean Team Col, warning = FALSE}
 
 seasons$Team <- seasons$Tm
 
@@ -275,7 +275,7 @@ head(seasons)
 
 ### Merge on PlayerID
 
-```{r Make the PlayerIDs}
+```{r Make the PlayerIDs, warning = FALSE}
 #make injury ID to merge
 all_injuries$PlayerID <- paste0(paste0(paste0(substring(all_injuries$FirstName, 1, 1), all_injuries$LastName), all_injuries$Position), all_injuries$Season)
 
@@ -285,7 +285,7 @@ seasons$PlayerID <- paste0(paste0(paste0(substring(seasons$FirstName, 1, 1), sea
 ```
 
 
-```{r}
+```{r warning = FALSE}
 #MERGE ON INJURIES AND SEASONS
 injuries <-  all_injuries %>% select(PlayerID, TotalInjuryCount, ConcussionTotal)
 seasons2010 <- seasons[seasons$Season >= 2010,] %>% select(-Tm)
@@ -297,7 +297,7 @@ head(joined)
 ```
 
 
-```{r Make final dataset}
+```{r Make final dataset, warning = FALSE}
 #Making cumulative cols and response var, this way we wouldn't have to use stratified sampling to keep players together
 final <- joined
 final <- final %>%
@@ -353,7 +353,7 @@ ThreeYearsLeft is 1, if you have 3 or more years left in the NFL and 0 if you ha
 
 
 ## Variable Exploration
-```{r Variable Exploration}
+```{r Variable Exploration, warning = FALSE}
 final %>% ungroup() %>%
   dplyr::select(YearsRemaining ,Age, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal) %>%
   pivot_longer(cols = -YearsRemaining) %>% 
@@ -371,7 +371,7 @@ Pts looks like the second most effective variable, as points increases, years re
 
 All other variables look like they will be pretty negligible predictors.
 
-```{r}
+```{r warning = FALSE}
 graphing_data <- final_1 %>% ungroup() %>%
   dplyr::select(ThreeYrLeft, Age) 
 graphing_data$ThreeYrLeft = as.factor(graphing_data$ThreeYrLeft)
@@ -388,7 +388,7 @@ As Age looked to be the most descriptive variable from our scatterplots, we chos
 
 ##Logistic Model for RBs
 
-```{r RB Logistic }
+```{r RB Logistic, warning = FALSE }
 set.seed(123)
 
 finalRB <- final_1[final_1$Pos == 'RB',]
@@ -422,7 +422,7 @@ Our first model is a logistic model for RB using all features and of those featu
 
 Age, Games and TD had negative coefficient so that as they increase, the odds of being in the league for 3 or more years decrease. Pts had a positive coefficient so as it increases, the odds of being in the league for 3 or more years increases.
 
-```{r Logistic Test}
+```{r Logistic Test, warning = FALSE}
 predictions <- predict(logisticRB, newdata = test_dataRB, type = "response")
 test_pred <- ifelse(is.na(predictions), NA, ifelse(predictions > 0.5, 1, 0))
 conf_matrix <- table(test_pred, test_dataRB$ThreeYrLeft)
@@ -450,7 +450,7 @@ It has an F1 score of 0.81, which is a high balanced metric of recall and precis
 This model had an AIC of 1330. Next we ran a mixed effects linear model using the significant factors.
 
 ## Logistic Model with Interaction for RBs
-```{r RB Mixed Effects}
+```{r RB Mixed Effects, warning=FALSE}
 
 logisticRB1 <- glm(ThreeYrLeft ~ Age *  G  * AllTD, train_dataRB, family = "binomial")
 summary(logisticRB1)
@@ -465,7 +465,7 @@ predictions <- predict(logisticRB1, newdata = test_dataRB, type = "response")
 At the 5% significance level, Age and the interaction between Games and Touchdowns had a negative correlation and the interaction between Age and Touchdowns had a positive correlation.
 
 Performed threshold testing to see if there is a better threshold than 0.5 for our logistic regression.
-```{r}
+```{r warning = FALSE}
 #Threshold Testing
 curr = 0
 for (i in seq(0.3, 0.7, by = 0.01)){
@@ -506,7 +506,7 @@ It has an F1 score of 0.81, which is a high balanced metric of recall and precis
 Overall, with the addition of threshold testing, although recall decreased, overall accuracy increased for our interaction model.
 
 ## Logistic Model for WRs
-```{r WR Logistic }
+```{r WR Logistic, warning = FALSE }
 
 finalWR <- final_1[final_1$Pos == 'WR',]
 
@@ -534,7 +534,7 @@ summary(logisticWR)
 
 sjPlot::plot_model(logisticWR, type ="pred")
 ```
-```{r}
+```{r warning=FALSE}
 predictions <- predict(logisticWR, newdata = test_dataWR, type = "response")
 test_pred <- ifelse(is.na(predictions), NA, ifelse(predictions > 0.5, 1, 0))
 conf_matrix <- table(test_pred, test_dataWR$ThreeYrLeft)
@@ -563,7 +563,7 @@ Games Starteda and TD Scored and Points Scored had a positive correlation, meani
 
 
 ## Logistic Model with Interaction for WRs
-```{r WR Mixed Effects}
+```{r WR Mixed Effects, warning=FALSE}
 logisticWR1 <- glm(ThreeYrLeft ~ Age * Pts * AllTD * G * GS, train_dataWR, family = "binomial")
 summary(logisticWR1)
 #AIC: 1947.4
@@ -572,7 +572,7 @@ predictions <- predict(logisticWR1, newdata = test_dataWR, type = "response")
 ```
 Age had a negative coefficient and the interaction between Age, Points, Touchdowns and Games Started had a marginally positive coefficient. Both were significant at 5%.
 
-```{r}
+```{r warning=FALSE}
 
 #Threshold Testing
 curr = 0
@@ -611,7 +611,7 @@ It has a recall of 0.94 meaning of all the players that actually had < 3 years l
 It has an F1 score of 0.78, which is a high balanced metric of recall and precision indicating this is a good model for identifying positives accurately, when a player will retire in less than 3 years.
 
 ## Linear Random Effects Model
-```{r Random Effects}
+```{r Random Effects, warning=FALSE}
 pos_data <- final_all %>% ungroup() %>% select(Age, Pos, G, GS, AllTD, Pts, TotalInjuryCount, ConcussionTotal, YearsRemaining)
 
 
@@ -634,7 +634,7 @@ Age has a significant negative coefficient meaning for every 0.15 years older, 1
 
 
 ## Linear Random Effects Model with Interaction
-```{r Games}
+```{r Games, warning=FALSE}
 scaled <- data.frame(cbind(scale(pos_data[,c('Age', 'G', 'YearsRemaining')]), pos_data$Pos)) %>% rename( 'Pos'='V4')
 scaled$Age <- as.numeric(scaled$Age)
 scaled$YearsRemaining <- as.numeric(scaled$YearsRemaining)
